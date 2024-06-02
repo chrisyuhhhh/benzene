@@ -9,12 +9,35 @@
 
 const http = require("http")
 const path = require("path");
-const url  = require("url");
-const fs   = require("fs")
+const url = require("url");
+const fs = require("fs")
 const mime = require('mime-types')
+const config = {}
+config.sites = require("./config/sites.json")
+config.general = require("./config/general.json")
+
+function getCurrentTimestamp() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+function log(text,type="INFO") {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const formatted = `${year}-${month}-${day}`;
+
+    fs.appendFileSync(path.join(__dirname,`${config.general.logs}/${formatted}.log`),`[${getCurrentTimestamp()}] [${type}] ${text}\r\n`)
+}
 
 function sendResponse(filePath, res) {
-    let stat = fs.statSync(filePath)
     let fileData = fs.readFileSync(filePath);
     let contentType = mime.lookup(filePath);
     res.setHeader('Content-Type', contentType);
@@ -25,10 +48,9 @@ function sendResponse(filePath, res) {
 
 http.createServer(function (req, res) {
     var url_parts = url.parse(req.url);
-    const filePath = path.join(__dirname,"serve",url_parts.pathname)
+    let site = config.sites["default"]
+    const filePath = path.join(__dirname,site.htdocs,url_parts.pathname)
     let extension = path.extname(filePath) // TODO: implement configurable sites with restrictable file extensions
-    const contentType = mime.lookup(extension) || 'application/octet-stream';
-    console.log(`hello world from ${filePath} (${extension})`)
     let found = false; // clean this please!!!!
                        // to whomever may be reading this: i wrote this code at 2am please dont judge
     if (!found && fs.existsSync(filePath)) {
@@ -49,7 +71,6 @@ http.createServer(function (req, res) {
     }
     if(!found) {
         let indexPath = path.join(filePath, "index.html");
-        console.log(`trying ${indexPath}`)
         if (fs.existsSync(indexPath)) {
             sendResponse(indexPath, res);
         } else {
@@ -59,4 +80,6 @@ http.createServer(function (req, res) {
         }
     }
     res.end();
-}).listen(80);
+}).listen(80,() => {
+    log(`listening on port 80`); // TODO: configurable ports
+});
